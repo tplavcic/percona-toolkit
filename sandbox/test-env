@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # This script controls the Percona Toolkit test environment.  The basic
-# environment is a master on port 12345 in /tmp/12345 and a slave on port
-# 12346 in /tmp/12346.  This script attempts to ensure that all environment
+# environment is a master on port 12345 in /tmp/pt-test/12345 and a slave on port
+# 12346 in /tmp/pt-test/12346.  This script attempts to ensure that all environment
 # vars like PERCONA_TOOLKIT_BRANCH and PERCONA_TOOLKIT_SANDBOX are correct.
 # Exist 0 on success/no errors, or 1 on any warnings or errors.
 
@@ -19,14 +19,14 @@ err() {
       echo
       for p in 12345 12346 12347; do
          echo "Sandbox $p:" >&2
-         if [ -d "/tmp/$p" ]; then
-            ls -lh /tmp/$p/* >&2
+         if [ -d "/tmp/pt-test/$p" ]; then
+            ls -lh /tmp/pt-test/$p/* >&2
             echo
-            cat /tmp/$p/data/mysqld.log >&2
+            cat /tmp/pt-test/$p/data/mysqld.log >&2
             echo
-            tail -n 100 /tmp/$p/data/genlog >&2
+            tail -n 100 /tmp/pt-test/$p/data/genlog >&2
          else
-            echo "/tmp/$p does not exist" >&2
+            echo "/tmp/pt-test/$p does not exist" >&2
          fi
       done
    fi
@@ -35,8 +35,8 @@ err() {
 usage() {
    err "Usage: test-env start|stop|restart|status|checkconfig|reset|kill" \
        ""                                                          \
-       "  start       Start test servers in /tmp/PORT"             \
-       "  stop        Stop test servers and remvoe all /tmp/PORT"  \
+       "  start       Start test servers in /tmp/pt-test/PORT"             \
+       "  stop        Stop test servers and remvoe all /tmp/pt-test/PORT"  \
        "  kill        Kill test servers (use if stop fails)"       \
        "  restart     Stop and start test servers"                 \
        "  status      Print status of test servers"                \
@@ -119,10 +119,10 @@ sandbox_status() {
    echo "MySQL $type test server on port $port:"
 
    echo -n "  PID file exists - "
-   if [ -f "/tmp/$port/data/mysql_sandbox$port.pid" ]; then
+   if [ -f "/tmp/pt-test/$port/data/mysql_sandbox$port.pid" ]; then
       echo "yes"
       echo -n "  PID file has a PID - "
-      local pid=`cat /tmp/$port/data/mysql_sandbox$port.pid 2>/dev/null`
+      local pid=`cat /tmp/pt-test/$port/data/mysql_sandbox$port.pid 2>/dev/null`
       if [ -n "$pid" ]; then
          echo "yes"
          echo -n "  process $pid is alive - "
@@ -143,13 +143,13 @@ sandbox_status() {
    fi
 
    echo -n "  MySQL is alive - "
-   $PERCONA_TOOLKIT_SANDBOX/bin/mysqladmin --defaults-file="/tmp/$port/my.sandbox.cnf" ping >/dev/null 2>&1
+   $PERCONA_TOOLKIT_SANDBOX/bin/mysqladmin --defaults-file="/tmp/pt-test/$port/my.sandbox.cnf" ping >/dev/null 2>&1
    if [ $? -eq 0 ]; then
       echo "yes"
 
       if [ "$MYSQL_VERSION" '>' "4.1" ]; then
          echo -n "  sakila db is loaded - "
-         /tmp/$port/use -e 'show databases like "sakila"' 2>/dev/null | grep sakila >/dev/null 2>&1
+         /tmp/pt-test/$port/use -e 'show databases like "sakila"' 2>/dev/null | grep sakila >/dev/null 2>&1
          if [ $? -eq 0 ]; then
             echo "yes"
          else
@@ -163,7 +163,7 @@ sandbox_status() {
          # Slave status should show:
          #   Slave_IO_Running: Yes
          #   Slave_SQL_Running: Yes
-         local slave_running=`/tmp/$port/use -e 'show slave status\G' 2>/dev/null | grep Running | grep -c Yes`
+         local slave_running=`/tmp/pt-test/$port/use -e 'show slave status\G' 2>/dev/null | grep Running | grep -c Yes`
          if [ $slave_running -eq 2 ]; then
             echo "yes"
          else
@@ -173,7 +173,7 @@ sandbox_status() {
 
          if [ -n "$master_port" ]; then
             echo -n "  slave to master $master_port - "
-            local mp=`/tmp/$port/use -e 'show slave status\G' 2>/dev/null | grep Master_Port | awk '{print $2}'`
+            local mp=`/tmp/pt-test/$port/use -e 'show slave status\G' 2>/dev/null | grep Master_Port | awk '{print $2}'`
             if [ "$mp" = "$master_port" ]; then
                echo "yes"
             else
@@ -191,7 +191,7 @@ sandbox_status() {
 
 sandbox_is_running() {
    local p=$1
-   ps xw | grep mysqld | grep -v grep | grep /tmp/$p >/dev/null
+   ps xw | grep mysqld | grep -v grep | grep /tmp/pt-test/$p >/dev/null
 }
 
 kill_sandbox() {
@@ -211,8 +211,8 @@ kill_sandbox() {
       sandbox_is_running $p 
       if [ $? -eq 0 ]; then
          # Kill both mysqld_safe and mysqld.
-         pid1=`ps xw | grep -v grep | grep mysqld_safe | grep /tmp/$p | awk '{print $1}'`
-         pid2=`ps xw | grep -v grep | grep -v mysqld_safe | grep mysqld | grep /tmp/$p | awk '{print $1}'`
+         pid1=`ps xw | grep -v grep | grep mysqld_safe | grep /tmp/pt-test/$p | awk '{print $1}'`
+         pid2=`ps xw | grep -v grep | grep -v mysqld_safe | grep mysqld | grep /tmp/pt-test/$p | awk '{print $1}'`
          [ "$pid1" ] && kill -9 $pid1  # Die, damn you, die!
          [ "$pid2" ] && kill -9 $pid2
          sleep 2
@@ -230,9 +230,9 @@ kill_sandbox() {
       fi
    fi
 
-   if [ -d "/tmp/$p" ]; then
-      rm -rf /tmp/$p
-      echo "Removed /tmp/$p"
+   if [ -d "/tmp/pt-test/$p" ]; then
+      rm -rf /tmp/pt-test/$p
+      echo "Removed /tmp/pt-test/$p"
    fi
 
    return 0
@@ -240,8 +240,8 @@ kill_sandbox() {
 
 MYSQL_VERSION=""
 set_mysql_version() {
-   if [ -d /tmp/12345 ] && [ -f /tmp/12345/use ]; then
-      MYSQL_VERSION=$(/tmp/12345/use -ss -e "SELECT VERSION()" \
+   if [ -d /tmp/pt-test/12345 ] && [ -f /tmp/pt-test/12345/use ]; then
+      MYSQL_VERSION=$(/tmp/pt-test/12345/use -ss -e "SELECT VERSION()" \
 	| cut -d'.' -f1,2)
    fi
 }
@@ -298,11 +298,11 @@ case $opt in
             exit_status=$((exit_status | $?))
             ./start-sandbox master 12347 
             exit_status=$((exit_status | $?))
-            /tmp/12345/use < $PERCONA_TOOLKIT_BRANCH/sandbox/gtid_on.sql
+            /tmp/pt-test/12345/use < $PERCONA_TOOLKIT_BRANCH/sandbox/gtid_on.sql
             exit_status=$?
-            /tmp/12346/use < $PERCONA_TOOLKIT_BRANCH/sandbox/gtid_on.sql
+            /tmp/pt-test/12346/use < $PERCONA_TOOLKIT_BRANCH/sandbox/gtid_on.sql
             exit_status=$?
-            /tmp/12347/use < $PERCONA_TOOLKIT_BRANCH/sandbox/slave_channels.sql
+            /tmp/pt-test/12347/use < $PERCONA_TOOLKIT_BRANCH/sandbox/slave_channels.sql
             exit_status=$?
          else
             ./start-sandbox "${2:-"slave"}" 12346 12345
@@ -316,10 +316,10 @@ case $opt in
             # changes old_node's my.sandbox.cnf's wsrep_cluster_address to
             # point to new_node. This is especially useful because otherwise,
             # calling stop/start like below on 12345 would create a new cluster.
-            /tmp/12345/stop  >/dev/null
-            /tmp/12345/start >/dev/null
+            /tmp/pt-test/12345/stop  >/dev/null
+            /tmp/pt-test/12345/start >/dev/null
             echo -n "Checking that the cluster size is correct... "
-            size=$(/tmp/12345/use -ss -e "SHOW STATUS LIKE 'wsrep_cluster_size'" | awk '{print $2}')
+            size=$(/tmp/pt-test/12345/use -ss -e "SHOW STATUS LIKE 'wsrep_cluster_size'" | awk '{print $2}')
             if [ ${size:-0} -ne 3 ]; then
                echo "FAILED"
             else
@@ -349,11 +349,11 @@ case $opt in
             # signaling that LOAD DATA LOCAL INFILE worked.
             ../util/check-load-data
 
-            ping=$(/tmp/12345/use -ss -e "SELECT MD5(RAND())")
-            /tmp/12345/use -e "SET AUTOCOMMIT=1; REPLACE INTO percona_test.sentinel (id, ping) VALUES (1, '$ping')";
+            ping=$(/tmp/pt-test/12345/use -ss -e "SELECT MD5(RAND())")
+            /tmp/pt-test/12345/use -e "SET AUTOCOMMIT=1; REPLACE INTO percona_test.sentinel (id, ping) VALUES (1, '$ping')";
             echo -n "Waiting for replication to finish..."
             for i in $(_seq 60); do
-               pong=$(/tmp/12347/use -ss -e "SELECT ping FROM percona_test.sentinel WHERE id=1 AND ping='$ping'" 2>/dev/null)
+               pong=$(/tmp/pt-test/12347/use -ss -e "SELECT ping FROM percona_test.sentinel WHERE id=1 AND ping='$ping'" 2>/dev/null)
                [ "$ping" = "$pong" ] && break
                echo -n '.'
                sleep 1

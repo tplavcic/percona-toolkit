@@ -12,20 +12,20 @@ fi
 exit_status=0
 
 for port in "$@"; do
-   if ! [ -d "/tmp/$port" ]; then
+   if ! [ -d "/tmp/pt-test/$port" ]; then
       echo "MySQL test server on port $port does not exist."
       continue
    fi
 
-   if [ -x "/tmp/$port/stop" ]; then
-      /tmp/$port/stop
+   if [ -x "/tmp/pt-test/$port/stop" ]; then
+      /tmp/pt-test/$port/stop
       exit_status=$((exit_status | $?))
    else
-      echo "/tmp/$port is missing files:" >&2
-      ls -la /tmp/$port >&2
+      echo "/tmp/pt-test/$port is missing files:" >&2
+      ls -la /tmp/pt-test/$port >&2
    fi
 
-   rm -rf /tmp/$port
+   rm -rf /tmp/pt-test/$port
    exit_status=$((exit_status | $?))
 done
 

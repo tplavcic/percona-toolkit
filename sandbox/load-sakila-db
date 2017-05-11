@@ -17,8 +17,8 @@ fi
 
 PORT=$1
 
-if [ ! -d "/tmp/$PORT" ]; then
-   die "MySQL test server does not exist: /tmp/$PORT"
+if [ ! -d "/tmp/pt-test/$PORT" ]; then
+   die "MySQL test server does not exist: /tmp/pt-test/$PORT"
 fi
 
 # ###########################################################################
@@ -32,9 +32,9 @@ if [ ! -d "$PERCONA_TOOLKIT_BRANCH" ]; then
    die "Invalid PERCONA_TOOLKIT_BRANCH directory: $PERCONA_TOOLKIT_BRANCH"
 fi
 
-/tmp/$PORT/use < $PERCONA_TOOLKIT_BRANCH/sandbox/sakila.sql
+/tmp/pt-test/$PORT/use < $PERCONA_TOOLKIT_BRANCH/sandbox/sakila.sql
 exit_status=$?
 
-/tmp/$PORT/use sakila -e "ANALYZE TABLE actor, address, category, city, country, customer, film, film_actor, film_category, film_text, inventory, language, payment, rental, staff, store" >/dev/null
+/tmp/pt-test/$PORT/use sakila -e "ANALYZE TABLE actor, address, category, city, country, customer, film, film_actor, film_category, film_text, inventory, language, payment, rental, staff, store" >/dev/null
 
 exit $exit_status
